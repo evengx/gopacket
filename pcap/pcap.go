@@ -186,7 +186,7 @@ type InterfaceAddress struct {
 // BPF is a compiled filter program, useful for offline packet matching.
 type BPF struct {
 	orig string
-	bpf  _Ctype_struct_bpf_program // takes a finalizer, not overriden by outsiders
+	bpf  C.struct_bpf_program // takes a finalizer, not overriden by outsiders
 }
 
 // BPFInstruction is a byte encoded structure holding a BPF instruction
@@ -442,7 +442,7 @@ func (p *Handle) Error() error {
 
 // Stats returns statistics on the underlying pcap handle.
 func (p *Handle) Stats() (stat *Stats, err error) {
-	var cstats _Ctype_struct_pcap_stat
+	var cstats C.struct_pcap_stat
 	if -1 == C.pcap_stats(p.cptr, &cstats) {
 		return nil, p.Error()
 	}
@@ -487,7 +487,7 @@ var pcapCompileMu sync.Mutex
 //
 //    C.pcap_freecode(&bpf)
 //
-func (p *Handle) compileBPFFilter(expr string) (_Ctype_struct_bpf_program, error) {
+func (p *Handle) compileBPFFilter(expr string) (C.struct_bpf_program, error) {
 	errorBuf := (*C.char)(C.calloc(errorBufferSize, 1))
 	defer C.free(unsafe.Pointer(errorBuf))
 
@@ -510,7 +510,7 @@ func (p *Handle) compileBPFFilter(expr string) (_Ctype_struct_bpf_program, error
 		}
 	}
 
-	var bpf _Ctype_struct_bpf_program
+	var bpf C.struct_bpf_program
 	cexpr := C.CString(expr)
 	defer C.free(unsafe.Pointer(cexpr))
 
@@ -543,7 +543,7 @@ func (p *Handle) CompileBPFFilter(expr string) ([]BPFInstruction, error) {
 		return nil, err
 	}
 
-	bpfInsn := (*[bpfInstructionBufferSize]_Ctype_struct_bpf_insn)(unsafe.Pointer(bpf.bf_insns))[0:bpf.bf_len:bpf.bf_len]
+	bpfInsn := (*[bpfInstructionBufferSize]C.struct_bpf_insn)(unsafe.Pointer(bpf.bf_insns))[0:bpf.bf_len:bpf.bf_len]
 	bpfInstruction := make([]BPFInstruction, len(bpfInsn), len(bpfInsn))
 
 	for i, v := range bpfInsn {
@@ -615,7 +615,7 @@ func (p *Handle) SetBPFInstructionFilter(bpfInstructions []BPFInstruction) (err 
 
 	return nil
 }
-func bpfInstructionFilter(bpfInstructions []BPFInstruction) (bpf _Ctype_struct_bpf_program, err error) {
+func bpfInstructionFilter(bpfInstructions []BPFInstruction) (bpf C.struct_bpf_program, err error) {
 	if len(bpfInstructions) < 1 {
 		return bpf, errors.New("bpfInstructions must not be empty")
 	}
@@ -628,7 +628,7 @@ func bpfInstructionFilter(bpfInstructions []BPFInstruction) (bpf _Ctype_struct_b
 	cbpfInsns := C.calloc(C.size_t(len(bpfInstructions)), C.size_t(unsafe.Sizeof(bpfInstructions[0])))
 
 	copy((*[bpfInstructionBufferSize]BPFInstruction)(cbpfInsns)[0:len(bpfInstructions)], bpfInstructions)
-	bpf.bf_insns = (*_Ctype_struct_bpf_insn)(cbpfInsns)
+	bpf.bf_insns = (*C.struct_bpf_insn)(cbpfInsns)
 
 	return
 }
@@ -738,10 +738,10 @@ func FindAllDevs() (ifs []Interface, err error) {
 	return
 }
 
-func findalladdresses(addresses *_Ctype_struct_pcap_addr) (retval []InterfaceAddress) {
+func findalladdresses(addresses *C.struct_pcap_addr) (retval []InterfaceAddress) {
 	// TODO - make it support more than IPv4 and IPv6?
 	retval = make([]InterfaceAddress, 0, 1)
-	for curaddr := addresses; curaddr != nil; curaddr = (*_Ctype_struct_pcap_addr)(curaddr.next) {
+	for curaddr := addresses; curaddr != nil; curaddr = (*C.struct_pcap_addr)(curaddr.next) {
 		// Strangely, it appears that in some cases, we get a pcap address back from
 		// pcap_findalldevs with a nil .addr.  It appears that we can skip over
 		// these.
